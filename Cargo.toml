@@ -1,5 +1,5 @@
 [package]
-name = "ytb_extraction"
+name = "yt2obsidian"
 version = "0.1.0"
 edition = "2024"
 

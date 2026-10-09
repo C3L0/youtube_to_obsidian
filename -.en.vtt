@@ -1,0 +1,265 @@
+WEBVTT
+Kind: captions
+Language: en
+
+00:00:00.160 --> 00:00:05.360
+The largest AI models today can have over a trillion parameters, which would take something
+
+00:00:05.360 --> 00:00:12.040
+like two terabytes of memory to store. But the largest GPU on the market holds about
+
+00:00:12.040 --> 00:00:18.480
+288GB, which is nowhere near enough to store these huge frontier models.
+
+00:00:18.680 --> 00:00:24.079
+So how are we running these models behind the chatbots everyone uses reliably for millions of
+
+00:00:24.080 --> 00:00:30.400
+people? The truth is, there is no single mega computer hosting the AI models you talk to every
+
+00:00:30.440 --> 00:00:36.560
+day. They're running on a coordinated system of dozens, sometimes hundreds of GPUs.
+
+00:00:37.280 --> 00:00:43.240
+Models need to be stored, run and support real user traffic in production. Confining this whole
+
+00:00:43.240 --> 00:00:48.720
+process to one GPU quickly introduces real constraints, bottlenecks and latency to your
+
+00:00:48.759 --> 00:00:54.080
+system. So let's fix this with distributed inference. The process of running an AI model by
+
+00:00:54.080 --> 00:01:00.320
+splitting the computational load across multiple interconnected devices or servers. A model is
+
+00:01:00.320 --> 00:01:06.489
+composed of layers, all storing "weights", or the knowledge of the model. To run a model, all the
+
+00:01:06.489 --> 00:01:13.410
+weights need to be initially stored in memory. On top of that, as the model runs, it accrues
+
+00:01:13.410 --> 00:01:18.689
+what we call working memory. Additional information about the conversation that allows it
+
+00:01:18.690 --> 00:01:25.369
+to remember what was previously said. This context, which we call the KV cache, is held in memory as
+
+00:01:25.370 --> 00:01:30.929
+well on top of the model itself. And lastly, every request takes a set amount of time to move
+
+00:01:30.930 --> 00:01:37.009
+through a GPU. If there are too many requests coming in at once, they get backed up in a queue
+
+00:01:37.010 --> 00:01:42.650
+and every user waits longer for a response. If we're hosting this for real users, we might have
+
+00:01:42.690 --> 00:01:47.289
+hundreds or thousands of people trying to reach the model at once. So we need to be able to
+
+00:01:47.330 --> 00:01:53.209
+concurrently serve many users. Serving a model in production means solving these three constraints
+
+00:01:53.209 --> 00:01:58.449
+at the same time. Model memory footprint. Whether the weights physically fit on the hardware, you
+
+00:01:58.449 --> 00:02:04.179
+have, KV cache growth, the content that keeps growing while you're serving and requests
+
+00:02:04.220 --> 00:02:10.299
+throughput, how many concurrent users you can serve. So let's start small. Let's say our model
+
+00:02:10.300 --> 00:02:16.899
+and its KV cache fits fine on one GPU, but we still have too many users to serve them all at
+
+00:02:16.899 --> 00:02:23.539
+once. What we can do is copy the entire model onto multiple GPUs, and then route
+
+00:02:23.539 --> 00:02:29.499
+request to them intelligently based on things like how loaded each GPU currently is, or which
+
+00:02:29.500 --> 00:02:36.419
+replica already has relevant cached context. This is data parallelism. Every replica is a full
+
+00:02:36.419 --> 00:02:40.699
+identical copy of the model. There's no coordination needed between them. You're just
+
+00:02:40.699 --> 00:02:46.139
+deciding which door each request walks through. But realistically, many of the smartest models
+
+00:02:46.139 --> 00:02:53.020
+can't fit on a single GPU. Recall that a model is really just a series of layers holding individual
+
+00:02:53.020 --> 00:02:58.499
+knowledge. Running inference means passing your input through these layers one at a time, kind of
+
+00:02:58.539 --> 00:03:05.149
+like an assembly line. So if our whole model is too big to fit, we can split or
+
+00:03:05.350 --> 00:03:12.070
+shard the model by layers. Say layers one and two live on the first GPU, layers three and four live
+
+00:03:12.070 --> 00:03:18.910
+on the second and so on. Real models will have a lot more layers, but you guys get the idea. This is
+
+00:03:18.910 --> 00:03:25.389
+pipeline parallelism. Every GPU holds only certain layers of the model that can comfortably fit in
+
+00:03:25.390 --> 00:03:30.669
+its memory. Now, if we send only one request through at a time, most of the GPUs sit idle,
+
+00:03:30.670 --> 00:03:37.070
+waiting for their turn to take full advantage of pipeline parallelism. Think assembly line. Keep
+
+00:03:37.070 --> 00:03:42.389
+requests continuously flowing through so every station stays busy instead of waiting on the one
+
+00:03:42.389 --> 00:03:48.229
+before it. We split the model vertically Now let's look at splitting it horizontally. Tensor
+
+00:03:48.229 --> 00:03:54.749
+parallelism divides each individual layer itself rather than dividing the model by layers. Every
+
+00:03:54.750 --> 00:04:00.949
+GPU gets a slice of the same layer, computes its piece of the layer's math, and then communicates
+
+00:04:00.949 --> 00:04:06.160
+with the others to combine their partial results back together. They then repeat that process for
+
+00:04:06.160 --> 00:04:12.999
+every single layer. That combining step is called a collective operation and its blocking for
+
+00:04:12.999 --> 00:04:19.639
+each layer because the GPUs have to constantly communicate mid computation. This only works when
+
+00:04:19.640 --> 00:04:25.799
+they're connected by a high bandwidth, low latency GPU interconnect, typically sitting inside the
+
+00:04:25.799 --> 00:04:31.279
+same server. Sending that chatter across a slower network could actually cause us to become a
+
+00:04:31.280 --> 00:04:38.079
+bottleneck rather than an optimization. There's also a more specialized case, a type of model
+
+00:04:38.079 --> 00:04:45.079
+called a mixture of experts or MoE model. This model, instead
+
+00:04:45.079 --> 00:04:51.039
+of holding one block of weights that runs for every single input, holds smaller subnetworks or
+
+00:04:51.079 --> 00:04:56.639
+experts that are meant to specialize in different parts of response generation. One could lean
+
+00:04:56.640 --> 00:05:02.488
+towards code samples. One could do punctuation. Maybe one does numbers
+
+00:05:03.290 --> 00:05:09.249
+because you've got so many subnetworks bundled together. MoE models tend to be humongous overall.
+
+00:05:09.890 --> 00:05:16.648
+Expert parallelism spreads those experts across GPUs, so they each hold a slice of experts instead
+
+00:05:16.649 --> 00:05:23.569
+of a copy of the entire model. At every MoE layer, each token gets dispatched to the handful
+
+00:05:23.569 --> 00:05:30.249
+of experts its router picked. Modern models will pick about eight experts out of 256,
+
+00:05:30.250 --> 00:05:37.170
+and then it'll all be combined back. This means far less computation per token, but paid for
+
+00:05:37.209 --> 00:05:42.929
+in all this GPU to GPU network traffic of dispatching the individual tokens and then
+
+00:05:42.929 --> 00:05:48.849
+combining the information afterward. Let's look at one last optimization. Prefilled decode
+
+00:05:48.849 --> 00:05:55.609
+disaggregation. During inference, you'll go through two main stages. Prefill
+
+00:05:56.769 --> 00:06:03.738
+and decode. And Prefill is
+
+00:06:03.739 --> 00:06:10.179
+where the model reads and understands your input. It operates on a fixed set of model weights and
+
+00:06:10.179 --> 00:06:17.019
+requires a lot of parallel computations at once. Its compute-bound, meaning the speed of this
+
+00:06:17.019 --> 00:06:23.779
+step is determined by how fast it can perform that math. This step builds the KV cache, our bank
+
+00:06:23.779 --> 00:06:30.539
+of working memory with each token it processes. Decode is where the model builds its
+
+00:06:30.540 --> 00:06:37.339
+response to the user. It generates a reply one token at a time, and it has to
+
+00:06:37.379 --> 00:06:44.339
+pull the entire KV cache for every step. Unlike these models weights, the KV cache is not fixed,
+
+00:06:44.339 --> 00:06:50.858
+so the demand for memory grows with every step of decode. Decode is memory-bandwidth-bound,
+
+00:06:50.940 --> 00:06:56.539
+meaning its speed is determined by how fast the data can be transferred from the memory. If
+
+00:06:56.540 --> 00:07:01.900
+co-located the decode phase's, increasing demand for memory can start to eat into the prefilled
+
+00:07:01.900 --> 00:07:07.790
+stage's territory as this KV cache grows. Because these two phases stress completely different
+
+00:07:07.790 --> 00:07:11.789
+parts of the hardware, it's actually more efficient to split them onto their own separate
+
+00:07:11.790 --> 00:07:18.589
+pools of GPUs, each one individually optimized for its own bottleneck. That said, this
+
+00:07:18.590 --> 00:07:25.230
+split only pays off if this handoff itself is super fast. The whole KV cache has to
+
+00:07:25.269 --> 00:07:30.670
+move from the prefill pool to the decode pool. So if the connection between the two pools is too
+
+00:07:30.670 --> 00:07:36.989
+slow, you'll burn through the time you just saved. In practice, that means the two pools need to sit
+
+00:07:37.029 --> 00:07:42.629
+on dedicated, low latency networking designed for high throughput data movement between compute
+
+00:07:42.629 --> 00:07:49.149
+nodes, not just a regular network link. Plain TCP over standard Ethernet usually isn't fast enough
+
+00:07:49.150 --> 00:07:54.670
+to make this split worth it, so traffic gets solved with more replicas. Too much model gets
+
+00:07:54.670 --> 00:08:00.630
+solved by splitting the weights by layer, by tensor, or by expert and too much growing memory
+
+00:08:00.670 --> 00:08:05.839
+doing two different kinds of work gets solved by giving each phase its own dedicated pool of
+
+00:08:05.839 --> 00:08:12.199
+hardware. In production, real deployments layer multiple techniques together at once. Tensor
+
+00:08:12.199 --> 00:08:19.160
+parallelism within a server. Pipeline parallelism across servers. Data parallelism across replicas.
+
+00:08:19.399 --> 00:08:24.999
+Expert parallelism for mixture of expert models and disaggregation, splitting the serving pipeline
+
+00:08:24.999 --> 00:08:31.999
+by phase. This is called multi-dimensional parallelism. And on top of it
+
+00:08:32.000 --> 00:08:38.919
+all sits an orchestration layer. Routing every request to the right pool of GPUs. Balancing
+
+00:08:38.919 --> 00:08:44.959
+load and handling hardware failures without dropping requests. This is a super complex topic,
+
+00:08:44.960 --> 00:08:49.799
+so drop any follow up questions in the comments or let me know how you're optimizing your model
+
+00:08:49.799 --> 00:08:52.039
+deployments with distributed inference.
+
