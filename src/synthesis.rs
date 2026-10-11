@@ -11,23 +11,28 @@ pub enum SynthesisError {
 impl fmt::Display for SynthesisError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::NetworkError(e) => write!(f, "Network error communicating with Ollama: {}", e),
-            Self::SerializationError(e) => write!(f, "Failed to parse JSON response: {}", e),
-            Self::ModelError(msg) => write!(f, "Model returned an error: {}", msg),
+            Self::NetworkError(e) => write!(f, "Network error: {}", e),
+            Self::SerializationError(e) => write!(f, "Failed to parse JSON: {}", e),
+            Self::ModelError(msg) => write!(f, "Model returned error: {}", msg),
         }
     }
 }
 
 impl std::error::Error for SynthesisError {}
 
-// Domain output
 #[derive(Debug, Serialize, Deserialize)]
 pub struct QaItem {
     #[serde(default)]
     pub question: String,
     #[serde(default)]
     pub answer: String,
-    #[serde(default, alias = "KeyConcepts", alias = "concepts", alias = "tags", alias = "keywords")]
+    #[serde(
+        default,
+        alias = "keyConcepts",
+        alias = "concepts",
+        alias = "tags",
+        alias = "keywords"
+    )]
     pub key_concepts: Vec<String>,
 }
 
@@ -57,6 +62,7 @@ struct OllamaOptions {
 #[derive(Deserialize)]
 struct OllamaResponse {
     response: String,
+    #[allow(dead_code)]
     #[serde(default)]
     done: bool,
 }
@@ -66,27 +72,27 @@ pub async fn synthesize_transcript(
     model_name: &str,
 ) -> Result<SynthesisReport, SynthesisError> {
     let client = reqwest::Client::new();
-    
-    let prompt = format!(
-        r#"You are an expert technical interviewer and educator. 
-        Analyze this veideo transcript and extract all interview questions, clear technical explanations, and core concepts.
 
-        Format your output strictly as a JSON object matching this schema:
-        {{
-            "main_topic": "General topic of the interview",
-            "items": [
-                {{
-                    "question": "The question asked or topic discussed",
-                    "answer": "Clear, concise technical explanation synthesized from the transcript",
-                    "key_concept": ["concept1", "concept2"]
-                }}
-            ]
-        }}
-        
-        Transcript:
-        {}
-        "#,
-            transcript_text
+    let prompt = format!(
+        r#"You are a technical educator. Extract interview Q&As from this transcript.
+For every item, you MUST provide 2 to 4 technical keywords in "key_concepts".
+
+Respond ONLY with valid JSON following this exact structure:
+{{
+  "main_topic": "Topic of the video",
+  "items": [
+    {{
+      "question": "The question or concept being explained",
+      "answer": "Detailed technical explanation synthesized from the transcript",
+      "key_concepts": ["concept-1", "concept-2", "concept-3"]
+    }}
+  ]
+}}
+
+Transcript:
+{}
+"#,
+        transcript_text
     );
 
     let request_payload = OllamaRequest {
@@ -106,11 +112,11 @@ pub async fn synthesize_transcript(
         .send()
         .await
         .map_err(SynthesisError::NetworkError)?;
-    
+
     if !response.status().is_success() {
         return Err(SynthesisError::ModelError(format!(
-            "Ollama returned Http status {}",
-            response.status(),
+            "Ollama returned HTTP {}",
+            response.status()
         )));
     }
 
@@ -122,7 +128,7 @@ pub async fn synthesize_transcript(
     let report: SynthesisReport = match serde_json::from_str(&parsed_body.response) {
         Ok(rep) => rep,
         Err(err) => {
-            eprintln!("\n[DEBUG] Raw Json from model: \n{}", parsed_body.response);
+            eprintln!("\n[DEBUG] Raw JSON from model:\n{}", parsed_body.response);
             return Err(SynthesisError::SerializationError(err));
         }
     };
