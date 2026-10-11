@@ -23,14 +23,19 @@ impl std::error::Error for SynthesisError {}
 // Domain output
 #[derive(Debug, Serialize, Deserialize)]
 pub struct QaItem {
+    #[serde(default)]
     pub question: String,
+    #[serde(default)]
     pub answer: String,
+    #[serde(default, alias = "KeyConcepts", alias = "concepts", alias = "tags", alias = "keywords")]
     pub key_concepts: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SynthesisReport {
+    #[serde(default, alias = "topic", alias = "title")]
     pub main_topic: String,
+    #[serde(default, alias = "questions", alias = "qa_pairs")]
     pub items: Vec<QaItem>,
 }
 
@@ -49,9 +54,10 @@ struct OllamaOptions {
     num_ctx: u32,
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize)]
 struct OllamaResponse {
     response: String,
+    #[serde(default)]
     done: bool,
 }
 
@@ -113,8 +119,13 @@ pub async fn synthesize_transcript(
         .await
         .map_err(SynthesisError::NetworkError)?;
 
-    let report: SynthesisReport = serde_json::from_str(&parsed_body.response)
-        .map_err(SynthesisError::SerializationError)?;
+    let report: SynthesisReport = match serde_json::from_str(&parsed_body.response) {
+        Ok(rep) => rep,
+        Err(err) => {
+            eprintln!("\n[DEBUG] Raw Json from model: \n{}", parsed_body.response);
+            return Err(SynthesisError::SerializationError(err));
+        }
+    };
 
     Ok(report)
 }
