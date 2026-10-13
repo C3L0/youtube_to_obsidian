@@ -43,13 +43,13 @@ impl ObsidianWriter {
             content.push_str(&format!("#{}\n\n", item.answer));
 
             if !item.key_concepts.is_empty(){
-                let tags = item
+                let wikilinks = item
                     .key_concepts
                     .iter()
-                    .map(|c| format!("#{}", c.trim().replace(' ', "-")))
+                    .map(|c| format!("[[{}]]", c.trim().replace(' ', "-")))
                     .collect::<Vec<_>>()
                     .join(" ");
-                content.push_str(&format!("**Concepts:** {}\n\n", tags));
+                content.push_str(&format!("**Concepts:** {}\n\n", wikilinks));
             }
 
             content.push_str("--- \n\n");
