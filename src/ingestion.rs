@@ -153,3 +153,43 @@ fn strip_tags(input: &str) -> String {
 
     result
 }
+
+/// Extracts all Shorts video URLs from a YouTube channel tab.
+pub fn fetch_channel_shorts(channel_url: &str) -> Result<Vec<String>, IngestionError> {
+    // Ensure the URL targets the /shorts tab
+    let target_url = if channel_url.ends_with("/shorts") {
+        channel_url.to_string()
+    } else {
+        format!("{}/shorts", channel_url.trim_end_matches('/'))
+    };
+
+    let output = Command::new("yt-dlp")
+        .args([
+            "--flat-playlist",
+            "--print", "id",
+            &target_url,
+        ])
+        .output()
+        .map_err(IngestionError::ProcessSpawnFailed)?;
+
+    if !output.status.success() {
+        return Err(IngestionError::ExecutionFailed {
+            status_code: output.status.code(),
+            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        });
+    }
+
+    let stdout_str = String::from_utf8_lossy(&output.stdout);
+    let urls: Vec<String> = stdout_str
+        .lines()
+        .map(|line| line.trim())
+        .filter(|line| !line.is_empty())
+        .map(|id| format!("https://www.youtube.com/shorts/{}", id))
+        .collect();
+
+    if urls.is_empty() {
+        return Err(IngestionError::EmptyTranscript);
+    }
+
+    Ok(urls)
+}
