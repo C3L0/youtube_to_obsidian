@@ -70,30 +70,11 @@ struct OllamaResponse {
 pub async fn synthesize_transcript(
     transcript_text: &str,
     model_name: &str,
+    prompt_template: &str,
 ) -> Result<SynthesisReport, SynthesisError> {
     let client = reqwest::Client::new();
 
-    let prompt = format!(
-        r#"You are a technical educator. Extract interview Q&As from this transcript.
-For every item, you MUST provide 2 to 4 technical keywords in "key_concepts".
-
-Respond ONLY with valid JSON following this exact structure:
-{{
-  "main_topic": "Topic of the video",
-  "items": [
-    {{
-      "question": "The question or concept being explained",
-      "answer": "Detailed technical explanation synthesized from the transcript",
-      "key_concepts": ["concept-1", "concept-2", "concept-3"]
-    }}
-  ]
-}}
-
-Transcript:
-{}
-"#,
-        transcript_text
-    );
+    let prompt = prompt_template.replace("{transcript}", transcript_text);
 
     let request_payload = OllamaRequest {
         model: model_name,

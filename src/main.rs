@@ -1,4 +1,5 @@
 use clap::Parser;
+use std::fs;
 use std::path::PathBuf;
 use std::process;
 use yt2obsidian::{
@@ -6,28 +7,71 @@ use yt2obsidian::{
     ObsidianWriter,
 };
 
+const DEFAULT_PROMPT: &str = r#"You are a technical educator. Extract interview Q&As from this transcript.
+For every item, you MUST provide 2 to 4 technical keywords in "key_concepts".
+
+Respond ONLY with valid JSON following this exact structure:
+{
+  "main_topic": "Topic of the video",
+  "items": [
+    {
+      "question": "The question or concept being explained",
+      "answer": "Detailed technical explanation synthesized from the transcript",
+      "key_concepts": ["concept-1", "concept-2", "concept-3"]
+    }
+  ]
+}
+
+Transcript:
+{transcript}
+"#;
+
 #[derive(Parser, Debug)]
 #[command(
     name = "yt2obsidian",
     about = "Extracts YouTube transcripts and generates structured Obsidian notes using a local LLM."
 )]
 struct Cli {
-    /// YouTube channel URL (e.g. https://www.youtube.com/@Channel) or single video URL
+    /// YouTube channel URL
     #[arg(required = true)]
     target: String,
 
-    /// Ollama model to use for synthesis
-    #[arg(short, long, default_value = "qwen2.5:7b")]
+    /// Ollama model
+    #[arg(short, long, env = "OLLAMA_MODEL", default_value = "qwen2.5:7b")]
     model: String,
 
-    /// Target Obsidian vault directory
-    #[arg(short, long, default_value = r"C:\Users\antoi\OneDrive\Documents\ytb2Obsidian")]
+    /// Obsidian vault directory
+    #[arg(short, long, env = "VAULT_PATH", default_value = "./vault")]
     vault: PathBuf,
+
+    /// Path to a custom prompt
+    #[arg(short, long, env = "PROMPT_TEMPLATE_PATH")]
+    prompt_path: Option<PathBuf>
 }
 
 #[tokio::main]
 async fn main() {
+    let _ = dotenvy::dotenv();
+
     let args = Cli::parse();
+
+    let prompt_template = match &args.prompt_path { 
+        Some(path) => {
+            match fs::read_to_string(path) {
+                Ok(content) => content,
+                Err(err) => {
+                    eprintln!(" Could not read prompt file {:?}: {}. Using default prompt.", path, err);
+                    DEFAULT_PROMPT.to_string()
+                }
+            }
+        }
+        None => DEFAULT_PROMPT.to_string(),
+    };
+
+    println!("Configuration Loaded:");    
+    println!("  Model: {}", args.model);
+    println!("  Vault Path: {}", args.vault.display());
+    println!("  Prompt Source: {}", if args.prompt_path.is_some() {"Custom File"} else {"Default Template"});
 
     // 1. Enumerate targets
     let video_urls: Vec<String> = if args.target.contains("/@")
@@ -92,7 +136,7 @@ async fn main() {
 
         // Stage 2: Synthesis
         println!("    Synthesizing with Ollama (model: {})...", args.model);
-        let report = match synthesize_transcript(&transcript.full_text, &args.model).await {
+        let report = match synthesize_transcript(&transcript.full_text, &args.model, &prompt_template).await {
             Ok(rep) => {
                 println!("    ✓ Synthesis complete ({} Q&A items).", rep.items.len());
                 rep

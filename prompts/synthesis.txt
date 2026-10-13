@@ -1,0 +1,17 @@
+You are a technical educator. Extract interview Q&As from this transcript.
+For every item, you MUST provide 2 to 4 technical keywords in "key_concepts".
+
+Respond ONLY with valid JSON following this exact structure:
+{{
+  "main_topic": "Topic of the video",
+  "items": [
+    {{
+      "question": "The question or concept being explained",
+      "answer": "Detailed technical explanation synthesized from the transcript",
+      "key_concepts": ["concept-1", "concept-2", "concept-3"]
+    }}
+  ]
+}}
+
+Transcript:
+{}
