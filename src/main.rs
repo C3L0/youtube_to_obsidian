@@ -3,8 +3,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::process;
 use yt2obsidian::{
-    fetch_channel_shorts, fetch_transcript, synthesize_transcript, CheckpointManager,
-    ObsidianWriter,
+    fetch_channel_shorts, fetch_transcript, CheckpointManager, ObsidianWriter,
+    OllamaSummarizer, Summarizer,
 };
 
 const DEFAULT_PROMPT: &str = r#"You are a technical educator. Extract interview Q&As from this transcript.
@@ -32,7 +32,7 @@ Transcript:
     about = "Extracts YouTube transcripts and generates structured Obsidian notes using a local LLM."
 )]
 struct Cli {
-    /// YouTube channel URL
+    /// YouTube channel URL or single video URL
     #[arg(required = true)]
     target: String,
 
@@ -46,7 +46,7 @@ struct Cli {
 
     /// Path to a custom prompt
     #[arg(short, long, env = "PROMPT_TEMPLATE_PATH")]
-    prompt_path: Option<PathBuf>
+    prompt_path: Option<PathBuf>,
 }
 
 #[tokio::main]
@@ -55,23 +55,33 @@ async fn main() {
 
     let args = Cli::parse();
 
-    let prompt_template = match &args.prompt_path { 
-        Some(path) => {
-            match fs::read_to_string(path) {
-                Ok(content) => content,
-                Err(err) => {
-                    eprintln!(" Could not read prompt file {:?}: {}. Using default prompt.", path, err);
-                    DEFAULT_PROMPT.to_string()
-                }
+    let prompt_template = match &args.prompt_path {
+        Some(path) => match fs::read_to_string(path) {
+            Ok(content) => content,
+            Err(err) => {
+                eprintln!(
+                    "Could not read prompt file {:?}: {}. Using default prompt.",
+                    path, err
+                );
+                DEFAULT_PROMPT.to_string()
             }
-        }
+        },
         None => DEFAULT_PROMPT.to_string(),
     };
 
-    println!("Configuration Loaded:");    
+    let summarizer = OllamaSummarizer::new(&args.model, "http://localhost:11434");
+
+    println!("Configuration Loaded:");
     println!("  Model: {}", args.model);
     println!("  Vault Path: {}", args.vault.display());
-    println!("  Prompt Source: {}", if args.prompt_path.is_some() {"Custom File"} else {"Default Template"});
+    println!(
+        "  Prompt Source: {}",
+        if args.prompt_path.is_some() {
+            "Custom File"
+        } else {
+            "Default Template"
+        }
+    );
 
     // 1. Enumerate targets
     let video_urls: Vec<String> = if args.target.contains("/@")
@@ -134,9 +144,9 @@ async fn main() {
             }
         };
 
-        // Stage 2: Synthesis
+        // Stage 2: Synthesis via the Summarizer trait
         println!("    Synthesizing with Ollama (model: {})...", args.model);
-        let report = match synthesize_transcript(&transcript.full_text, &args.model, &prompt_template).await {
+        let report = match summarizer.summarize(&transcript.full_text, &prompt_template).await {
             Ok(rep) => {
                 println!("    ✓ Synthesis complete ({} Q&A items).", rep.items.len());
                 rep
@@ -148,11 +158,9 @@ async fn main() {
         };
 
         // Stage 3: Storage
-        let write_result = writer.write_report(&report, url);
-        match write_result {
+        match writer.write_report(&report, url) {
             Ok(file_path) => {
                 println!("    ✓ Saved note: {}", file_path.display());
-                // Stage 4: Commit checkpoint to ledger
                 if let Err(e) = checkpoint.mark_completed(url) {
                     eprintln!("    ⚠ Warning: Failed to write to checkpoint ledger: {}", e);
                 } else {
