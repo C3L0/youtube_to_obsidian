@@ -1,7 +1,7 @@
+use crate::synthesis::SynthesisReport;
 use std::fs;
 use std::io;
-use std::path::{Path,PathBuf};
-use crate::synthesis::SynthesisReport;
+use std::path::{Path, PathBuf};
 
 pub struct ObsidianWriter {
     vault_dir: PathBuf,
@@ -9,7 +9,7 @@ pub struct ObsidianWriter {
 
 impl ObsidianWriter {
     pub fn new<P: AsRef<Path>>(vault_dir: P) -> Self {
-        Self { 
+        Self {
             vault_dir: vault_dir.as_ref().to_path_buf(),
         }
     }
@@ -37,12 +37,12 @@ impl ObsidianWriter {
         content.push_str(&format!("# {}\n\n", report.main_topic));
         content.push_str(&format!("*Source: [{}]({})*\n\n", source_url, source_url));
         content.push_str("## Questions and Answers\n\n");
-        
-        for(idx, item) in report.items.iter().enumerate() {
-            content.push_str(&format!("# {}. {}\n\n",idx+1, item.question));
+
+        for (idx, item) in report.items.iter().enumerate() {
+            content.push_str(&format!("# {}. {}\n\n", idx + 1, item.question));
             content.push_str(&format!("#{}\n\n", item.answer));
 
-            if !item.key_concepts.is_empty(){
+            if !item.key_concepts.is_empty() {
                 let wikilinks = item
                     .key_concepts
                     .iter()
@@ -63,7 +63,7 @@ impl ObsidianWriter {
 fn sanitize_filename(name: &str) -> String {
     let sanitized: String = name
         .chars()
-        .map(|c| match c{
+        .map(|c| match c {
             '/' | '\\' | '<' | '>' | ':' | '"' | '|' | '?' | '*' => '-',
             _ => c,
         })

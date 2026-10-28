@@ -3,8 +3,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::process;
 use yt2obsidian::{
-    fetch_channel_shorts, fetch_transcript, CheckpointManager, ObsidianWriter,
-    OllamaSummarizer, Summarizer,
+    CheckpointManager, ObsidianWriter, OllamaSummarizer, Summarizer, fetch_channel_shorts,
+    fetch_transcript,
 };
 
 const DEFAULT_PROMPT: &str = r#"You are a technical educator. Extract interview Q&As from this transcript.
@@ -135,7 +135,10 @@ async fn main() {
         // Stage 1: Ingestion
         let transcript = match fetch_transcript(url) {
             Ok(t) => {
-                println!("    ✓ Transcript ingested ({} characters).", t.full_text.len());
+                println!(
+                    "    ✓ Transcript ingested ({} characters).",
+                    t.full_text.len()
+                );
                 t
             }
             Err(err) => {
@@ -146,7 +149,10 @@ async fn main() {
 
         // Stage 2: Synthesis via the Summarizer trait
         println!("    Synthesizing with Ollama (model: {})...", args.model);
-        let report = match summarizer.summarize(&transcript.full_text, &prompt_template).await {
+        let report = match summarizer
+            .summarize(&transcript.full_text, &prompt_template)
+            .await
+        {
             Ok(rep) => {
                 println!("    ✓ Synthesis complete ({} Q&A items).", rep.items.len());
                 rep

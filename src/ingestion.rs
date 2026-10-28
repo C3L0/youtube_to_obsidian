@@ -8,7 +8,10 @@ use std::process::Command;
 #[derive(Debug)]
 pub enum IngestionError {
     ProcessSpawnFailed(std::io::Error),
-    ExecutionFailed { status_code: Option<i32>, stderr: String },
+    ExecutionFailed {
+        status_code: Option<i32>,
+        stderr: String,
+    },
     FileReadFailed(std::io::Error),
     EmptyTranscript,
 }
@@ -17,8 +20,16 @@ impl fmt::Display for IngestionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ProcessSpawnFailed(err) => write!(f, "Failed to spawn yt-dlp: {}", err),
-            Self::ExecutionFailed { status_code, stderr } => {
-                write!(f, "yt-dlp failed (code {:?}): {}", status_code, stderr.trim())
+            Self::ExecutionFailed {
+                status_code,
+                stderr,
+            } => {
+                write!(
+                    f,
+                    "yt-dlp failed (code {:?}): {}",
+                    status_code,
+                    stderr.trim()
+                )
             }
             Self::FileReadFailed(err) => write!(f, "Failed to read subtitle file: {}", err),
             Self::EmptyTranscript => write!(f, "No subtitle content was extracted or matched"),
@@ -60,9 +71,12 @@ fn run_ytdlp(url: &str) -> Result<String, IngestionError> {
             "--skip-download",
             "--write-auto-sub",
             "--write-sub",
-            "--sub-lang", "en.*,en",
-            "--sub-format", "vtt",
-            "-o", &template_str,
+            "--sub-lang",
+            "en.*,en",
+            "--sub-format",
+            "vtt",
+            "-o",
+            &template_str,
             url,
         ])
         .output()
@@ -95,8 +109,7 @@ fn run_ytdlp(url: &str) -> Result<String, IngestionError> {
     };
 
     // 4. Read the file into memory and remove it from disk
-    let vtt_content = fs::read_to_string(&file_path)
-        .map_err(IngestionError::FileReadFailed)?;
+    let vtt_content = fs::read_to_string(&file_path).map_err(IngestionError::FileReadFailed)?;
     let _ = fs::remove_file(file_path);
 
     Ok(vtt_content)
@@ -164,11 +177,7 @@ pub fn fetch_channel_shorts(channel_url: &str) -> Result<Vec<String>, IngestionE
     };
 
     let output = Command::new("yt-dlp")
-        .args([
-            "--flat-playlist",
-            "--print", "id",
-            &target_url,
-        ])
+        .args(["--flat-playlist", "--print", "id", &target_url])
         .output()
         .map_err(IngestionError::ProcessSpawnFailed)?;
 

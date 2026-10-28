@@ -1,6 +1,6 @@
+use crate::synthesis::{SynthesisError, SynthesisReport};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use crate::synthesis::{SynthesisError, SynthesisReport};
 
 #[async_trait]
 pub trait Summarizer: Send + Sync {
