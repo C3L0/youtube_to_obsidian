@@ -1,0 +1,5 @@
+target/
+.git/
+.env
+processed_shorts.txt
+ytb2ObsidianVault/

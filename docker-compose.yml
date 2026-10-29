@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: yt2obsidian_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+app:
+  build:
+    context: .
+    dockerfile: Dockerfile
+  container_name: yt2obsidian_app
+  environment:
+    - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b}
+    - VAULT_PATH=/vault 
+  volumes:
+    - ${HOST_VAULT_PATH:-./vault}:/vault 
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  depends_on:
+    - ollama
+  
+volumes: 
+  ollama_data
