@@ -51,7 +51,10 @@ struct Cli {
 
 #[tokio::main]
 async fn main() {
-    let _ = dotenvy::dotenv();
+    match dotenvy::dotenv() {
+        Ok(path) => println!("==> Successfully loaded .env from: {}", path.display()),
+        Err(err) => eprintln!("==> Could NOT load .env file: {}", err),
+    }
 
     let args = Cli::parse();
 
