@@ -31,6 +31,6 @@ jobs:
               run: cargo clippy -- -D warnings
 
             - name: Run Integration & Unit Tests
-              run: Cargo test --verbose
+              run: cargo test --verbose
 
 
